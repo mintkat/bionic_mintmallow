@@ -595,7 +595,8 @@ ifeq ($(strip $(DEBUG_BIONIC_LIBC)),true)
 endif
 
 ifeq ($(MALLOC_IMPL),dlmalloc)
-  libc_common_cflags += -DUSE_DLMALLOC
+  # gcc spews warnings about possible aliasing rule violations in ok code in dlmalloc.c
+  libc_common_cflags += -DUSE_DLMALLOC -Wno-error=strict-aliasing
   libc_malloc_src := bionic/dlmalloc.c
 else
   libc_common_cflags += -DUSE_JEMALLOC
