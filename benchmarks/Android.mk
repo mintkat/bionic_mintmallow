@@ -26,9 +26,10 @@ benchmark_cflags := \
     -Wall \
     -Wextra \
     -Werror \
-    -Wunused \
+    -Wno-unused-variable \
 
 benchmark_cppflags := \
+    -Wno-unused-variable \
 
 benchmarklib_src_files := \
     Benchmark.cpp \
