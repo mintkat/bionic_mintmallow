@@ -1,6 +1,6 @@
 LOCAL_PATH := $(call my-dir)
 
-bionic_coverage := false
+bionic_coverage ?= false
 
 # Make everything depend on any changes to included makefiles.
 libc_common_additional_dependencies := $(LOCAL_PATH)/Android.mk
@@ -58,6 +58,7 @@ libc_common_src_files := \
     bionic/system_properties_compat.c \
     stdio/findfp.c \
     stdio/fread.c \
+    stdio/refill.c \
     stdio/snprintf.c\
     stdio/sprintf.c \
     stdio/stdio.c \
@@ -243,10 +244,11 @@ libc_bionic_src_files += bionic/fork.cpp
 # dereferences.
 libc_bionic_src_files += bionic/getauxval.cpp
 
-# These three require getauxval, which isn't available on older platforms.
+# These four require getauxval, which isn't available on older platforms.
 libc_bionic_src_files += bionic/getentropy_linux.c
 libc_bionic_src_files += bionic/sysconf.cpp
 libc_bionic_src_files += bionic/vdso.cpp
+libc_bionic_src_files += bionic/setjmp_cookie.cpp
 
 libc_cxa_src_files := \
     bionic/__cxa_guard.cpp \
@@ -257,12 +259,7 @@ libc_upstream_freebsd_src_files := \
     upstream-freebsd/lib/libc/gen/ldexp.c \
     upstream-freebsd/lib/libc/gen/sleep.c \
     upstream-freebsd/lib/libc/gen/usleep.c \
-    upstream-freebsd/lib/libc/stdlib/abs.c \
     upstream-freebsd/lib/libc/stdlib/getopt_long.c \
-    upstream-freebsd/lib/libc/stdlib/imaxabs.c \
-    upstream-freebsd/lib/libc/stdlib/imaxdiv.c \
-    upstream-freebsd/lib/libc/stdlib/labs.c \
-    upstream-freebsd/lib/libc/stdlib/llabs.c \
     upstream-freebsd/lib/libc/stdlib/qsort.c \
     upstream-freebsd/lib/libc/stdlib/quick_exit.c \
     upstream-freebsd/lib/libc/stdlib/realpath.c \
@@ -345,7 +342,7 @@ libc_upstream_openbsd_gdtoa_src_files_64 := \
     $(libc_upstream_openbsd_gdtoa_src_files) \
     upstream-openbsd/lib/libc/gdtoa/strtorQ.c \
 
-# These two depend on getentropy_linux.cpp, which isn't in libc_ndk.a.
+# These two depend on getentropy_linux.c, which isn't in libc_ndk.a.
 libc_upstream_openbsd_src_files := \
     upstream-openbsd/lib/libc/crypt/arc4random.c \
     upstream-openbsd/lib/libc/crypt/arc4random_uniform.c \
@@ -457,7 +454,6 @@ libc_upstream_openbsd_ndk_src_files := \
     upstream-openbsd/lib/libc/stdio/puts.c \
     upstream-openbsd/lib/libc/stdio/putwc.c \
     upstream-openbsd/lib/libc/stdio/putwchar.c \
-    upstream-openbsd/lib/libc/stdio/refill.c \
     upstream-openbsd/lib/libc/stdio/remove.c \
     upstream-openbsd/lib/libc/stdio/rewind.c \
     upstream-openbsd/lib/libc/stdio/rget.c \
@@ -491,11 +487,16 @@ libc_upstream_openbsd_ndk_src_files := \
     upstream-openbsd/lib/libc/stdio/wprintf.c \
     upstream-openbsd/lib/libc/stdio/wscanf.c \
     upstream-openbsd/lib/libc/stdio/wsetup.c \
+    upstream-openbsd/lib/libc/stdlib/abs.c \
     upstream-openbsd/lib/libc/stdlib/atoi.c \
     upstream-openbsd/lib/libc/stdlib/atol.c \
     upstream-openbsd/lib/libc/stdlib/atoll.c \
     upstream-openbsd/lib/libc/stdlib/getenv.c \
     upstream-openbsd/lib/libc/stdlib/insque.c \
+    upstream-openbsd/lib/libc/stdlib/imaxabs.c \
+    upstream-openbsd/lib/libc/stdlib/imaxdiv.c \
+    upstream-openbsd/lib/libc/stdlib/labs.c \
+    upstream-openbsd/lib/libc/stdlib/llabs.c \
     upstream-openbsd/lib/libc/stdlib/lsearch.c \
     upstream-openbsd/lib/libc/stdlib/reallocarray.c \
     upstream-openbsd/lib/libc/stdlib/remque.c \
@@ -619,7 +620,6 @@ libc_common_conlyflags := \
 
 # Define some common cppflags
 libc_common_cppflags := \
-    -std=gnu++11
 
 # Define some common includes
 # ========================================================

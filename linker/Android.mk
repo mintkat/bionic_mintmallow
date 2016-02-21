@@ -2,7 +2,9 @@ LOCAL_PATH := $(call my-dir)
 
 include $(CLEAR_VARS)
 
-LOCAL_SRC_FILES:= \
+LOCAL_CLANG := true
+
+LOCAL_SRC_FILES := \
     debugger.cpp \
     dlfcn.cpp \
     linker.cpp \
@@ -31,6 +33,10 @@ LOCAL_LDFLAGS := \
 
 LOCAL_CFLAGS += \
     -fno-stack-protector \
+    -fno-builtin-malloc \
+    -fno-builtin-calloc \
+    -fno-builtin-realloc \
+    -fno-builtin-free \
     -Wstrict-overflow=5 \
     -fvisibility=hidden \
     -Wall -Wextra -Wunused -Werror \
@@ -42,7 +48,6 @@ LOCAL_CONLYFLAGS += \
     -std=gnu11 \
 
 LOCAL_CPPFLAGS += \
-    -std=gnu++11 \
     -Wold-style-cast \
 
 ifeq ($(TARGET_IS_64_BIT),true)
@@ -60,7 +65,7 @@ LOCAL_ASFLAGS := $(LOCAL_CFLAGS)
 
 LOCAL_ADDITIONAL_DEPENDENCIES := $(LOCAL_PATH)/Android.mk
 
-LOCAL_STATIC_LIBRARIES := libc_nomalloc libziparchive libutils libz liblog
+LOCAL_STATIC_LIBRARIES := libc_nomalloc libziparchive libutils libbase libz liblog
 
 LOCAL_FORCE_STATIC_EXECUTABLE := true
 

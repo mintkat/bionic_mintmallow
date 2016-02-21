@@ -26,33 +26,40 @@
  * SUCH DAMAGE.
  */
 
+#include <assert.h>
 #include <errno.h>
-#include <sys/mman.h>
-#include <stdarg.h>
-#include <stdint.h>
-#include <unistd.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/auxv.h>
+#include <sys/cdefs.h>
 
-#include "private/bionic_macros.h"
+#include "private/libc_logging.h"
 
-extern "C" void* ___mremap(void*, size_t, size_t, int, void*);
+extern "C" __LIBC_HIDDEN__ int getentropy(void*, size_t);
+static long __bionic_setjmp_cookie;
 
-void* mremap(void* old_address, size_t old_size, size_t new_size, int flags, ...) {
-  // prevent allocations large enough for `end - start` to overflow
-  size_t rounded = BIONIC_ALIGN(new_size, PAGE_SIZE);
-  if (rounded < new_size || rounded > PTRDIFF_MAX) {
-    errno = ENOMEM;
-    return MAP_FAILED;
-  }
+extern "C" void __bionic_setjmp_cookie_init() {
+  char* random_data = reinterpret_cast<char*>(getauxval(AT_RANDOM));
+  long value = *reinterpret_cast<long*>(random_data + 8);
 
-  void* new_address = nullptr;
-  // The optional argument is only valid if the MREMAP_FIXED flag is set,
-  // so we assume it's not present otherwise.
-  if ((flags & MREMAP_FIXED) != 0) {
-    va_list ap;
-    va_start(ap, flags);
-    new_address = va_arg(ap, void*);
-    va_end(ap);
-  }
-  return ___mremap(old_address, old_size, new_size, flags, new_address);
+  // Mask off the last bit to store the signal flag.
+  __bionic_setjmp_cookie = value & ~1;
 }
 
+extern "C" long __bionic_setjmp_cookie_get(long sigflag) {
+  if (sigflag & ~1) {
+    __libc_fatal("unexpected sigflag value: %ld", sigflag);
+  }
+
+  return __bionic_setjmp_cookie | sigflag;
+}
+
+// Aborts if cookie doesn't match, returns the signal flag otherwise.
+extern "C" long __bionic_setjmp_cookie_check(long cookie) {
+  if (__bionic_setjmp_cookie != (cookie & ~1)) {
+    __libc_fatal("setjmp cookie mismatch");
+  }
+
+  return cookie & 1;
+}

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
+ * Copyright (C) 2016 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,9 +14,18 @@
  * limitations under the License.
  */
 
-#ifndef _BIONIC_FREEBSD_SPINLOCK_H_included
-#define _BIONIC_FREEBSD_SPINLOCK_H_included
+#include <sys/sysmacros.h>
 
-/* TODO: until we have the FreeBSD findfp.c, this is useless. */
+#include <gtest/gtest.h>
 
-#endif
+TEST(sys_sysmacros, makedev) {
+  ASSERT_EQ(0x12345aabbcc678ddULL, makedev(0x12345678, 0xaabbccdd));
+}
+
+TEST(sys_sysmacros, major) {
+  ASSERT_EQ(0x12345678UL, major(0x12345aabbcc678dd));
+}
+
+TEST(sys_sysmacros, minor) {
+  ASSERT_EQ(0xaabbccddUL, minor(0x12345aabbcc678dd));
+}

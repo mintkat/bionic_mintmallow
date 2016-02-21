@@ -26,33 +26,28 @@
  * SUCH DAMAGE.
  */
 
-#include <errno.h>
-#include <sys/mman.h>
-#include <stdarg.h>
-#include <stdint.h>
-#include <unistd.h>
+#include <ctype.h>
+#include <stdlib.h>
 
-#include "private/bionic_macros.h"
-
-extern "C" void* ___mremap(void*, size_t, size_t, int, void*);
-
-void* mremap(void* old_address, size_t old_size, size_t new_size, int flags, ...) {
-  // prevent allocations large enough for `end - start` to overflow
-  size_t rounded = BIONIC_ALIGN(new_size, PAGE_SIZE);
-  if (rounded < new_size || rounded > PTRDIFF_MAX) {
-    errno = ENOMEM;
-    return MAP_FAILED;
+// Parse a string like: 0, 2-4, 6.
+static int GetCpuCountFromString(const char* s) {
+  int cpu_count = 0;
+  int last_cpu = -1;
+  while (*s != '\0') {
+    if (isdigit(*s)) {
+      int cpu = static_cast<int>(strtol(s, const_cast<char**>(&s), 10));
+      if (last_cpu != -1) {
+        cpu_count += cpu - last_cpu;
+      } else {
+        cpu_count++;
+      }
+      last_cpu = cpu;
+    } else {
+      if (*s == ',') {
+        last_cpu = -1;
+      }
+      s++;
+    }
   }
-
-  void* new_address = nullptr;
-  // The optional argument is only valid if the MREMAP_FIXED flag is set,
-  // so we assume it's not present otherwise.
-  if ((flags & MREMAP_FIXED) != 0) {
-    va_list ap;
-    va_start(ap, flags);
-    new_address = va_arg(ap, void*);
-    va_end(ap);
-  }
-  return ___mremap(old_address, old_size, new_size, flags, new_address);
+  return cpu_count;
 }
-

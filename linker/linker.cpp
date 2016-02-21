@@ -58,6 +58,8 @@
 #include "linker_phdr.h"
 #include "linker_relocs.h"
 #include "linker_reloc_iterators.h"
+
+#include "base/strings.h"
 #include "ziparchive/zip_archive.h"
 
 extern void __libc_init_AT_SECURE(KernelArgumentBlock&);
@@ -284,25 +286,9 @@ static void soinfo_free(soinfo* si) {
 
 static void parse_path(const char* path, const char* delimiters,
                        std::vector<std::string>* paths) {
-  if (path == nullptr) {
-    return;
-  }
-
   paths->clear();
-
-  for (const char *p = path; ; ++p) {
-    size_t len = strcspn(p, delimiters);
-    // skip empty tokens
-    if (len == 0) {
-      continue;
-    }
-
-    paths->push_back(std::string(p, len));
-    p += len;
-
-    if (*p == '\0') {
-      break;
-    }
+  if (path != nullptr) {
+    *paths = android::base::Split(path, delimiters);
   }
 }
 
@@ -890,6 +876,67 @@ typedef linked_list_t<soinfo> SoinfoLinkedList;
 typedef linked_list_t<const char> StringLinkedList;
 typedef linked_list_t<LoadTask> LoadTaskList;
 
+static soinfo* find_library(const char* name, int rtld_flags, const android_dlextinfo* extinfo);
+
+// g_ld_all_shim_libs maintains the references to memory as it used
+// in the soinfo structures and in the g_active_shim_libs list.
+
+static std::vector<std::string> g_ld_all_shim_libs;
+
+// g_active_shim_libs are all shim libs that are still eligible
+// to be loaded.  We must remove a shim lib from the list before
+// we load the library to avoid recursive loops (load shim libA
+// for libB where libA also links against libB).
+
+static linked_list_t<const std::string> g_active_shim_libs;
+
+static void reset_g_active_shim_libs(void) {
+  g_active_shim_libs.clear();
+  for (const auto& pair : g_ld_all_shim_libs) {
+    g_active_shim_libs.push_back(&pair);
+  }
+}
+
+static void parse_LD_SHIM_LIBS(const char* path) {
+  parse_path(path, " :", &g_ld_all_shim_libs);
+  reset_g_active_shim_libs();
+}
+
+static bool shim_lib_matches(const char *shim_lib, const char *realpath) {
+  const char *sep = strchr(shim_lib, '|');
+  return sep != nullptr && strncmp(realpath, shim_lib, sep - shim_lib) == 0;
+}
+
+template<typename F>
+static void shim_libs_for_each(const char *const path, F action) {
+  if (path == nullptr) return;
+  INFO("Finding shim libs for \"%s\"\n", path);
+  std::vector<const std::string *> matched;
+
+  g_active_shim_libs.for_each([&](const std::string *a_pair) {
+    const char *pair = a_pair->c_str();
+    if (shim_lib_matches(pair, path)) {
+      matched.push_back(a_pair);
+    }
+  });
+
+  g_active_shim_libs.remove_if([&](const std::string *a_pair) {
+    const char *pair = a_pair->c_str();
+    return shim_lib_matches(pair, path);
+  });
+
+  for (const auto& one_pair : matched) {
+    const char* const pair = one_pair->c_str();
+    const char* sep = strchr(pair, '|');
+    soinfo *child = find_library(sep+1, RTLD_GLOBAL, nullptr);
+    if (child) {
+      INFO("Using shim lib \"%s\"\n", sep+1);
+      action(child);
+    } else {
+      PRINT("Shim lib \"%s\" can not be loaded, ignoring.", sep+1);
+    }
+  }
+}
 
 // This function walks down the tree of soinfo dependencies
 // in breadth-first order and
@@ -899,7 +946,7 @@ typedef linked_list_t<LoadTask> LoadTaskList;
 // walk_dependencies_tree returns false if walk was terminated
 // by the action and true otherwise.
 template<typename F>
-static bool walk_dependencies_tree(soinfo* root_soinfos[], size_t root_soinfos_size, F action) {
+static bool walk_dependencies_tree(soinfo* root_soinfos[], size_t root_soinfos_size, bool do_shims, F action) {
   SoinfoLinkedList visit_list;
   SoinfoLinkedList visited;
 
@@ -919,6 +966,13 @@ static bool walk_dependencies_tree(soinfo* root_soinfos[], size_t root_soinfos_s
 
     visited.push_back(si);
 
+    if (do_shims) {
+      shim_libs_for_each(si->get_realpath(), [&](soinfo* child) {
+        si->add_child(child);
+        visit_list.push_back(child);
+      });
+    }
+
     si->get_children().for_each([&](soinfo* child) {
       visit_list.push_back(child);
     });
@@ -933,7 +987,7 @@ static const ElfW(Sym)* dlsym_handle_lookup(soinfo* root, soinfo* skip_until,
   const ElfW(Sym)* result = nullptr;
   bool skip_lookup = skip_until != nullptr;
 
-  walk_dependencies_tree(&root, 1, [&](soinfo* current_soinfo) {
+  walk_dependencies_tree(&root, 1, false, [&](soinfo* current_soinfo) {
     if (skip_lookup) {
       skip_lookup = current_soinfo != skip_until;
       return true;
@@ -1513,6 +1567,7 @@ static bool find_libraries(soinfo* start_with, const char* const library_names[]
   walk_dependencies_tree(
       start_with == nullptr ? soinfos : &start_with,
       start_with == nullptr ? soinfos_count : 1,
+      true,
       [&] (soinfo* si) {
     local_group.push_back(si);
     return true;
@@ -1692,6 +1747,7 @@ soinfo* do_dlopen(const char* name, int flags, const android_dlextinfo* extinfo)
   }
 
   ProtectedDataGuard guard;
+  reset_g_active_shim_libs();
   soinfo* si = find_library(name, flags, extinfo);
   if (si != nullptr) {
     si->call_constructors();
@@ -2138,14 +2194,14 @@ bool soinfo::relocate(const VersionTracker& version_tracker, ElfRelIteratorT&& r
         MARK(rel->r_offset);
         TRACE_TYPE(RELO, "RELO R_X86_64_32 %08zx <- +%08zx %s", static_cast<size_t>(reloc),
                    static_cast<size_t>(sym_addr), sym_name);
-        *reinterpret_cast<ElfW(Addr)*>(reloc) = sym_addr + addend;
+        *reinterpret_cast<Elf32_Addr*>(reloc) = sym_addr + addend;
         break;
       case R_X86_64_64:
         count_relocation(kRelocRelative);
         MARK(rel->r_offset);
         TRACE_TYPE(RELO, "RELO R_X86_64_64 %08zx <- +%08zx %s", static_cast<size_t>(reloc),
                    static_cast<size_t>(sym_addr), sym_name);
-        *reinterpret_cast<ElfW(Addr)*>(reloc) = sym_addr + addend;
+        *reinterpret_cast<Elf64_Addr*>(reloc) = sym_addr + addend;
         break;
       case R_X86_64_PC32:
         count_relocation(kRelocRelative);
@@ -2153,7 +2209,7 @@ bool soinfo::relocate(const VersionTracker& version_tracker, ElfRelIteratorT&& r
         TRACE_TYPE(RELO, "RELO R_X86_64_PC32 %08zx <- +%08zx (%08zx - %08zx) %s",
                    static_cast<size_t>(reloc), static_cast<size_t>(sym_addr - reloc),
                    static_cast<size_t>(sym_addr), static_cast<size_t>(reloc), sym_name);
-        *reinterpret_cast<ElfW(Addr)*>(reloc) = sym_addr + addend - reloc;
+        *reinterpret_cast<Elf32_Addr*>(reloc) = sym_addr + addend - reloc;
         break;
 #elif defined(__arm__)
       case R_ARM_ABS32:
@@ -3164,9 +3220,11 @@ static ElfW(Addr) __linker_init_post_relocation(KernelArgumentBlock& args, ElfW(
   // doesn't cost us anything.
   const char* ldpath_env = nullptr;
   const char* ldpreload_env = nullptr;
+  const char* ldshim_libs_env = nullptr;
   if (!getauxval(AT_SECURE)) {
     ldpath_env = getenv("LD_LIBRARY_PATH");
     ldpreload_env = getenv("LD_PRELOAD");
+    ldshim_libs_env = getenv("LD_SHIM_LIBS");
   }
 
   INFO("[ android linker & debugger ]");
@@ -3220,6 +3278,7 @@ static ElfW(Addr) __linker_init_post_relocation(KernelArgumentBlock& args, ElfW(
   // Use LD_LIBRARY_PATH and LD_PRELOAD (but only if we aren't setuid/setgid).
   parse_LD_LIBRARY_PATH(ldpath_env);
   parse_LD_PRELOAD(ldpreload_env);
+  parse_LD_SHIM_LIBS(ldshim_libs_env);
 
   somain = si;
 

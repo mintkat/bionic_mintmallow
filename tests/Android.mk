@@ -46,8 +46,7 @@ else
 test_cflags += -DUSE_JEMALLOC
 endif
 
-test_cppflags = \
-    -std=gnu++11 \
+test_cppflags := \
 
 libBionicStandardTests_src_files := \
     arpa_inet_test.cpp \
@@ -102,6 +101,7 @@ libBionicStandardTests_src_files := \
     sys_statvfs_test.cpp \
     sys_syscall_test.cpp \
     sys_sysinfo_test.cpp \
+    sys_sysmacros_test.cpp \
     sys_time_test.cpp \
     sys_types_test.cpp \
     sys_uio_test.cpp \
@@ -162,6 +162,7 @@ $(foreach compiler,gcc clang, \
   ) \
 )
 
+fortify1-tests-gcc_clang_target := false
 module := fortify1-tests-gcc
 module_tag := optional
 build_type := target
@@ -170,6 +171,7 @@ include $(LOCAL_PATH)/Android.build.mk
 build_type := host
 include $(LOCAL_PATH)/Android.build.mk
 
+fortify2-tests-gcc_clang_target := false
 module := fortify2-tests-gcc
 module_tag := optional
 build_type := target
@@ -295,7 +297,6 @@ bionic-unit-tests_ldflags := \
 
 bionic-unit-tests_c_includes := \
     bionic/libc \
-    $(call include-path-for, libpagemap) \
 
 bionic-unit-tests_shared_libraries_target := \
     libdl \
