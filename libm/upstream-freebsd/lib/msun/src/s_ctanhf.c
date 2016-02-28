@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/lib/msun/src/s_ctanhf.c 284428 2015-06-15 20:47:26Z tijl $");
+__FBSDID("$FreeBSD$");
 
 #include <complex.h>
 #include <math.h>
@@ -51,19 +51,18 @@ ctanhf(float complex z)
 
 	if (ix >= 0x7f800000) {
 		if (ix & 0x7fffff)
-			return (CMPLXF((x + 0) * (y + 0),
-			    y == 0 ? y : (x + 0) * (y + 0)));
+			return (cpackf(x, (y == 0 ? y : x * y)));
 		SET_FLOAT_WORD(x, hx - 0x40000000);
-		return (CMPLXF(x,
+		return (cpackf(x,
 		    copysignf(0, isinf(y) ? y : sinf(y) * cosf(y))));
 	}
 
 	if (!isfinite(y))
-		return (CMPLXF(y - y, y - y));
+		return (cpackf(y - y, y - y));
 
-	if (ix >= 0x41300000) {	/* |x| >= 11 */
+	if (ix >= 0x41300000) {	/* x >= 11 */
 		float exp_mx = expf(-fabsf(x));
-		return (CMPLXF(copysignf(1, x),
+		return (cpackf(copysignf(1, x),
 		    4 * sinf(y) * cosf(y) * exp_mx * exp_mx));
 	}
 
@@ -72,14 +71,14 @@ ctanhf(float complex z)
 	s = sinhf(x);
 	rho = sqrtf(1 + s * s);
 	denom = 1 + beta * s * s;
-	return (CMPLXF((beta * rho * s) / denom, t / denom));
+	return (cpackf((beta * rho * s) / denom, t / denom));
 }
 
 float complex
 ctanf(float complex z)
 {
 
-	z = ctanhf(CMPLXF(cimagf(z), crealf(z)));
-	return (CMPLXF(cimagf(z), crealf(z)));
+	z = ctanhf(cpackf(-cimagf(z), crealf(z)));
+	return (cpackf(cimagf(z), -crealf(z)));
 }
 

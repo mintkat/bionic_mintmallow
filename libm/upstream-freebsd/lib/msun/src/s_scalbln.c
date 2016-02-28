@@ -25,30 +25,52 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/lib/msun/src/s_scalbln.c 278339 2015-02-07 00:38:18Z kargl $");
+__FBSDID("$FreeBSD$");
 
+#include <limits.h>
 #include <math.h>
 
-#define	NMAX	65536
-#define	NMIN	-65536
-
 double
-scalbln(double x, long n)
+scalbln (double x, long n)
 {
+	int in;
 
-	return (scalbn(x, (n > NMAX) ? NMAX : (n < NMIN) ? NMIN : (int)n));
+	in = (int)n;
+	if (in != n) {
+		if (n > 0)
+			in = INT_MAX;
+		else
+			in = INT_MIN;
+	}
+	return (scalbn(x, in));
 }
 
 float
-scalblnf(float x, long n)
+scalblnf (float x, long n)
 {
+	int in;
 
-	return (scalbnf(x, (n > NMAX) ? NMAX : (n < NMIN) ? NMIN : (int)n));
+	in = (int)n;
+	if (in != n) {
+		if (n > 0)
+			in = INT_MAX;
+		else
+			in = INT_MIN;
+	}
+	return (scalbnf(x, in));
 }
 
 long double
-scalblnl(long double x, long n)
+scalblnl (long double x, long n)
 {
+	int in;
 
-	return (scalbnl(x, (n > NMAX) ? NMAX : (n < NMIN) ? NMIN : (int)n));
+	in = (int)n;
+	if (in != n) {
+		if (n > 0)
+			in = INT_MAX;
+		else
+			in = INT_MIN;
+	}
+	return (scalbnl(x, (int)n));
 }

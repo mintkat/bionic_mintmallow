@@ -25,7 +25,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: head/lib/msun/src/s_cprojl.c 275819 2014-12-16 09:21:56Z ed $");
+__FBSDID("$FreeBSD$");
 
 #include <complex.h>
 #include <math.h>
@@ -39,5 +39,5 @@ cprojl(long double complex z)
 	if (!isinf(creall(z)) && !isinf(cimagl(z)))
 		return (z);
 	else
-		return (CMPLXL(INFINITY, copysignl(0.0, cimagl(z))));
+		return (cpackl(INFINITY, copysignl(0.0, cimagl(z))));
 }
