@@ -1,4 +1,4 @@
-/*	$OpenBSD: warn.c,v 1.11 2015/08/31 02:53:57 guenther Exp $ */
+/*	$OpenBSD: warn.c,v 1.10 2012/12/05 23:20:00 deraadt Exp $ */
 /*-
  * Copyright (c) 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -31,13 +31,17 @@
 #include <err.h>
 #include <stdarg.h>
 
+/* PRINTFLIKE1 */
 void
-warn(const char *fmt, ...)
+_warn(const char *fmt, ...)
 {
 	va_list ap;
 
 	va_start(ap, fmt);
-	vwarn(fmt, ap);
+	_vwarn(fmt, ap);
 	va_end(ap);
 }
-DEF_WEAK(warn);
+
+/* PRINTFLIKE1 */
+__weak_alias(warn, _warn);
+

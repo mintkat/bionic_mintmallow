@@ -1,4 +1,4 @@
-/*	$OpenBSD: time.c,v 1.7 2015/10/29 03:58:55 mmcc Exp $ */
+/*	$OpenBSD: time.c,v 1.5 2005/08/08 08:05:34 espie Exp $ */
 /*
  * Copyright (c) 1983, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -28,18 +28,17 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/types.h>
 #include <sys/time.h>
-#include <time.h>
 
 time_t
 time(time_t *t)
 {
 	struct timeval tt;
 
-	if (gettimeofday(&tt, NULL) < 0)
+	if (gettimeofday(&tt, (struct timezone *)0) < 0)
 		return (-1);
 	if (t)
 		*t = (time_t)tt.tv_sec;
 	return (tt.tv_sec);
 }
-DEF_STRONG(time);

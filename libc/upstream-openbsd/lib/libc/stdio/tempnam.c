@@ -1,4 +1,4 @@
-/*	$OpenBSD: tempnam.c,v 1.19 2015/08/31 02:53:57 guenther Exp $ */
+/*	$OpenBSD: tempnam.c,v 1.17 2013/09/30 12:02:35 millert Exp $ */
 /*
  * Copyright (c) 1988, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -39,6 +39,8 @@
 __warn_references(tempnam,
     "warning: tempnam() possibly used unsafely; consider using mkstemp()");
 
+extern char *_mktemp(char *);
+
 char *
 tempnam(const char *dir, const char *pfx)
 {
@@ -56,7 +58,7 @@ tempnam(const char *dir, const char *pfx)
 		    f[strlen(f) - 1] == '/' ? "" : "/", pfx);
 		if (len < 0 || len >= PATH_MAX) {
 			errno = ENAMETOOLONG;
-			goto fail;
+			return(NULL);
 		}
 		if ((f = _mktemp(name)))
 			return(f);
@@ -68,7 +70,7 @@ tempnam(const char *dir, const char *pfx)
 		    f[strlen(f) - 1] == '/' ? "" : "/", pfx);
 		if (len < 0 || len >= PATH_MAX) {
 			errno = ENAMETOOLONG;
-			goto fail;
+			return(NULL);
 		}
 		if ((f = _mktemp(name)))
 			return(f);
@@ -78,7 +80,7 @@ tempnam(const char *dir, const char *pfx)
 	len = snprintf(name, PATH_MAX, "%s%sXXXXXXXXX", f, pfx);
 	if (len < 0 || len >= PATH_MAX) {
 		errno = ENAMETOOLONG;
-		goto fail;
+		return(NULL);
 	}
 	if ((f = _mktemp(name)))
 		return(f);
@@ -87,12 +89,11 @@ tempnam(const char *dir, const char *pfx)
 	len = snprintf(name, PATH_MAX, "%s%sXXXXXXXXX", f, pfx);
 	if (len < 0 || len >= PATH_MAX) {
 		errno = ENAMETOOLONG;
-		goto fail;
+		return(NULL);
 	}
 	if ((f = _mktemp(name)))
 		return(f);
 
-fail:
 	sverrno = errno;
 	free(name);
 	errno = sverrno;

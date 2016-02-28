@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfwprintf.c,v 1.15 2015/12/28 22:08:18 mmcc Exp $ */
+/*	$OpenBSD: vfwprintf.c,v 1.12 2014/12/21 00:23:30 daniel Exp $ */
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -667,7 +667,10 @@ reswitch:	switch (ch) {
 				prec = dtoaend - dtoaresult;
 			if (expt == INT_MAX)
 				ox[1] = '\0';
-			free(convbuf);
+			if (convbuf) {
+				free(convbuf);
+				convbuf = NULL;
+			}
 			cp = convbuf = __mbsconv(dtoaresult, -1);
 			if (cp == NULL)
 				goto error;
@@ -716,7 +719,10 @@ fp_begin:
 				if (expt == 9999)
 					expt = INT_MAX;
  			}
-			free(convbuf);
+			if (convbuf) {
+				free(convbuf);
+				convbuf = NULL;
+			}
 			cp = convbuf = __mbsconv(dtoaresult, -1);
 			if (cp == NULL)
 				goto error;
@@ -806,6 +812,7 @@ fp_common:
 			 * defined manner.''
 			 *	-- ANSI X3J11
 			 */
+			/* NOSTRICT */
 			_umax = (u_long)GETARG(void *);
 			base = HEX;
 			xdigs = xdigs_lower;
@@ -822,7 +829,10 @@ fp_common:
 				char *mbsarg;
 				if ((mbsarg = GETARG(char *)) == NULL)
 					mbsarg = "(null)";
-				free(convbuf);
+				if (convbuf) {
+					free(convbuf);
+					convbuf = NULL;
+				}
 				convbuf = __mbsconv(mbsarg, prec);
 				if (convbuf == NULL) {
 					fp->_flags |= __SERR;
@@ -1038,7 +1048,8 @@ overflow:
 	ret = -1;
 
 finish:
-	free(convbuf);
+	if (convbuf)
+		free(convbuf);
 #ifdef FLOATING_POINT
 	if (dtoaresult)
 		__freedtoa(dtoaresult);
@@ -1061,7 +1072,6 @@ vfwprintf(FILE * __restrict fp, const wchar_t * __restrict fmt0, __va_list ap)
 
 	return (r);
 }
-DEF_STRONG(vfwprintf);
 
 /*
  * Type ids for argument type table.

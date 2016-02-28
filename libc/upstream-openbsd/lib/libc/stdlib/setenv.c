@@ -1,4 +1,4 @@
-/*	$OpenBSD: setenv.c,v 1.16 2015/09/13 08:31:47 guenther Exp $ */
+/*	$OpenBSD: setenv.c,v 1.14 2012/09/23 16:08:04 jeremy Exp $ */
 /*
  * Copyright (c) 1987 Regents of the University of California.
  * All rights reserved.
@@ -31,6 +31,8 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+
+char *__findenv(const char *name, int len, int *offset);
 
 extern char **environ;
 static char **lastenv;				/* last value of environ */
@@ -69,7 +71,7 @@ putenv(char *str)
 	for (P = environ; *P != NULL; P++)
 		;
 	cnt = P - environ;
-	P = reallocarray(lastenv, cnt + 2, sizeof(char *));
+	P = (char **)realloc(lastenv, sizeof(char *) * (cnt + 2));
 	if (!P)
 		return (-1);
 	if (lastenv != environ)
@@ -79,7 +81,6 @@ putenv(char *str)
 	environ[cnt + 1] = NULL;
 	return (0);
 }
-DEF_WEAK(putenv);
 
 /*
  * setenv --
@@ -128,7 +129,7 @@ setenv(const char *name, const char *value, int rewrite)
 		for (P = environ; *P != NULL; P++)
 			;
 		cnt = P - environ;
-		P = reallocarray(lastenv, cnt + 2, sizeof(char *));
+		P = (char **)realloc(lastenv, sizeof(char *) * (cnt + 2));
 		if (!P)
 			return (-1);
 		if (lastenv != environ)
@@ -146,7 +147,6 @@ setenv(const char *name, const char *value, int rewrite)
 		;
 	return (0);
 }
-DEF_WEAK(setenv);
 
 /*
  * unsetenv(name) --
@@ -178,4 +178,3 @@ unsetenv(const char *name)
 	}
 	return (0);
 }
-DEF_WEAK(unsetenv);
